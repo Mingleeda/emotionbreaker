@@ -10,3 +10,7 @@ dist/
 coverage/
 work/
 outputs/
+
+# iOS 빌드 산출물 (xcodegen이 프로젝트를 생성)
+apps/ios/build/
+apps/ios/EmotionBreaker.xcodeproj/
