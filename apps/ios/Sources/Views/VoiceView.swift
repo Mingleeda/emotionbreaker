@@ -67,6 +67,12 @@ final class VoiceRecorderModel: ObservableObject {
 
             let inputNode = audioEngine.inputNode
             let format = inputNode.outputFormat(forBus: 0)
+            // 입력 디바이스가 없거나 준비 전이면 탭 설치가 무의미하다 — 조용한 실패 대신 즉시 안내.
+            guard format.sampleRate > 0, format.channelCount > 0 else {
+                errorMessage = "마이크 입력을 사용할 수 없어요. 다른 앱이 마이크를 쓰고 있는지 확인하거나, 글로 적기로 계속해 주세요."
+                cleanup()
+                return
+            }
             inputNode.removeTap(onBus: 0)
             inputNode.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
                 request.append(buffer)
@@ -82,7 +88,7 @@ final class VoiceRecorderModel: ObservableObject {
                         self.transcript = result.bestTranscription.formattedString
                     }
                     if error != nil, self.phase == .recording {
-                        self.stopRecording()
+                        self.finishRecording(after: error)
                     }
                 }
             }
@@ -107,6 +113,21 @@ final class VoiceRecorderModel: ObservableObject {
         guard phase == .recording else { return }
         cleanup()
         phase = .finished
+    }
+
+    /// 인식 도중 에러로 끝났을 때: 받아 적은 게 있으면 그대로 완료, 없으면 원인을 안내하고 처음으로.
+    private func finishRecording(after error: Error?) {
+        cleanup()
+        if transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            phase = .idle
+            errorMessage = "음성 인식이 중간에 끊겼어요. 네트워크를 확인하고 다시 시도하거나, 글로 적기로 계속해 주세요."
+            if let error {
+                // 실기기 진단용 — 콘솔에만 남긴다.
+                print("[VoiceRecorder] recognition error: \(error)")
+            }
+        } else {
+            phase = .finished
+        }
     }
 
     func reset() {
